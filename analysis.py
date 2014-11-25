@@ -46,8 +46,9 @@ class QubicAnalysis(object):
                     tod2map_func = tod2map_each
                 self.reconstructed_map, self.coverage = tod2map_func(
                     acquisition, self._tod, tol=tol, maxiter=maxiter)
-                self.coverage = convolution(self.coverage)
-                self.coverage_thr = coverage_thr
+            self.calc_coverage()
+            self.coverage = convolution(self.coverage)
+            self.coverage_thr = coverage_thr
         else:
             if coverage == None:
                 raise TypeError("Must provide the coverage map!")
@@ -197,3 +198,29 @@ class QubicAnalysis(object):
         cov = self.normalized_coverage()
         map[cov == 0.] = 0.
         return map, cov
+
+    def calc_coverage(self):
+        if hasattr(self, 'coverage'):
+            return
+        if not hasattr(self, 'acquisition'):
+            raise ValueError('myqubic.QubicAnalysis.calc_coverage:' +
+                             ' For calculating coverage the analysis ' +
+                             'object has to have acquisition in attributes!')
+        acq = self.acquisition
+        projection = acq.get_projection_operator()
+        distribution = acq.get_distribution_operator()
+        P = projection * distribution
+        shape = len(acq.instrument), len(acq.sampling)
+        kind = acq.scene.kind
+        if kind == 'I':
+            ones = np.ones(shape)
+        elif kind == 'IQU':
+            ones = np.zeros(shape + (3,))
+            ones[..., 0] = 1
+        else:
+            raise NotImplementedError()
+        coverage = P.T(ones)
+        if kind == 'IQU':
+            coverage = coverage[..., 0]
+        self.coverage = coverage
+        return
