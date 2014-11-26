@@ -199,28 +199,17 @@ class QubicAnalysis(object):
         map[cov == 0.] = 0.
         return map, cov
 
-    def calc_coverage(self):
+    def calc_coverage(self, nside=None):
         if hasattr(self, 'coverage'):
             return
         if not hasattr(self, 'acquisition'):
             raise ValueError('myqubic.QubicAnalysis.calc_coverage:' +
                              ' For calculating coverage the analysis ' +
                              'object has to have acquisition in attributes!')
-        acq = self.acquisition
-        projection = acq.get_projection_operator()
-        distribution = acq.get_distribution_operator()
-        P = projection * distribution
-        shape = len(acq.instrument), len(acq.sampling)
-        kind = acq.scene.kind
-        if kind == 'I':
-            ones = np.ones(shape)
-        elif kind == 'IQU':
-            ones = np.zeros(shape + (3,))
-            ones[..., 0] = 1
-        else:
-            raise NotImplementedError()
-        coverage = P.T(ones)
-        if kind == 'IQU':
-            coverage = coverage[..., 0]
-        self.coverage = coverage
-        return
+        ndet = len(self.acquisition.instrument)
+        if nside == None:
+            nside = self._scene_nside
+        coverage = np.zeros(hp.nside2npix(nside))
+        for idet in xrange(ndet):
+            coverage += self.OneDetCoverage(idet, convolve=False)
+        self.coverage = cov
