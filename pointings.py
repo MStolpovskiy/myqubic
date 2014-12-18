@@ -14,7 +14,7 @@ def create_sweeping_pointings(parameter_to_change= None,
                               sampling_period=0.05,
                               angspeed=1,
                               delta_az=30,
-                              nsweeps_per_elevation=300,
+                              nsweeps_per_elevation=320,
                               angspeed_psi=1,
                               maxpsi=15,
                               date_obs=None,
@@ -228,3 +228,15 @@ def create_sweeping_pointings(parameter_to_change= None,
     
     return out
 
+def corrupt_pointing(pointing, 
+                     sigma_azimuth=None, # arcsec
+                     sigma_elevation=None,
+                     sigma_psi=None):
+    nsamples = len(pointing) 
+    if sigma_azimuth != None:
+        pointing.azimuth += np.random.normal(0, sigma_azimuth, nsamples)
+    if sigma_elevation != None:
+        pointing.elevation += np.random.normal(0, sigma_elevation, nsamples)
+    if sigma_psi != None:
+        pointing.sigma_psi += np.random.normal(0, sigma_psi, nsamples)
+    return pointing

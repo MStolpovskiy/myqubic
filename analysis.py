@@ -7,6 +7,7 @@ from qubic import (
     map2tod, tod2map_all, tod2map_each, QubicScene, QubicAcquisition, QubicInstrument)
 from pdb import set_trace
 from copy import copy
+from time import time
 
 class QubicAnalysis(object):
     def __init__(self,
@@ -20,7 +21,8 @@ class QubicAnalysis(object):
                  pickable=True,
                  noise=True,
                  weighted_noise=False,
-                 run_analysis=True):
+                 run_analysis=True,
+                 calculate_coverage=False):
         modes = 'all', 'each'
         if mode not in modes:
             raise ValueError("The only modes implemented are {0}.".format(
@@ -36,18 +38,26 @@ class QubicAnalysis(object):
                 self.acquisition = acquisition
             self._detectors_number = len(acquisition.instrument.detector)
             if run_analysis:
+                time0 = time()
                 self._tod, self.input_map_convolved = map2tod(
                     acquisition, input_map, convolution=True)
+                time1 = time()
+                print time1 - time0, 'for map2tod'
                 if noise:
-                    self._tod += acquisition.get_noise()
+                    # 4.7 corresponds to a one year of data noise
+                    self._tod += 4.7 * acquisition.get_noise()
                 if mode == 'all':
                     tod2map_func = tod2map_all
                 elif mode == 'each':
                     tod2map_func = tod2map_each
+                time0 = time()
                 self.reconstructed_map, self.coverage = tod2map_func(
                     acquisition, self._tod, tol=tol, maxiter=maxiter)
-            self.calc_coverage()
-            self.coverage = convolution(self.coverage)
+                time1 = time()
+                print time1 - time0, 'for tod2map'
+            if calculate_coverage:
+                self.calc_coverage()
+                self.coverage = convolution(self.coverage)
             self.coverage_thr = coverage_thr
         else:
             if coverage == None:
@@ -129,8 +139,8 @@ class QubicAnalysis(object):
 
     def Eta(self):
         return (self.Omega() / 
-          ((hp.ud_grade(self.normalized_coverage(), 32) *
-            hp.pixelfunc.nside2pixarea(32, degrees=True))**2).sum())
+                ((self.normalized_coverage() *
+                  hp.pixelfunc.nside2pixarea(self._scene_nside, degrees=True))**2).sum())
 
     def OneDetCoverage(self, detnum, convolve=False, nside=None):
         '''
