@@ -222,4 +222,4 @@ class QubicAnalysis(object):
         coverage = np.zeros(hp.nside2npix(nside))
         for idet in xrange(ndet):
             coverage += self.OneDetCoverage(idet, convolve=False)
-        self.coverage = cov
+        self.coverage = coverage
