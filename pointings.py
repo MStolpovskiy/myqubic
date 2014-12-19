@@ -228,15 +228,21 @@ def create_sweeping_pointings(parameter_to_change= None,
     
     return out
 
-def corrupt_pointing(pointing, 
-                     sigma_azimuth=0, # arcsec
+def corrupt_pointing(pointing,
+                     sigma_azimuth=0, # arcmin
                      sigma_elevation=0,
-                     sigma_psi=0):
-    nsamples = len(pointing) 
+                     sigma_psi=0,
+                     units='arcmin'):
+    nsamples = len(pointing)
+    if units not in ('arcsec', 'arcmin', 'deg'):
+        raise ValueError('Wrong units for corrupt_pointing function')
+    coef = {'arcsec': 3600,
+            'arcmin': 60,
+            'deg': 1}[units]
     if sigma_azimuth != 0:
-        pointing.azimuth += np.random.normal(0, sigma_azimuth, nsamples)
+        pointing.azimuth += np.random.normal(0, sigma_azimuth/coef, nsamples)
     if sigma_elevation != 0:
-        pointing.elevation += np.random.normal(0, sigma_elevation, nsamples)
+        pointing.elevation += np.random.normal(0, sigma_elevation/coef, nsamples)
     if sigma_psi != 0:
-        pointing.pitch += np.random.normal(0, sigma_psi, nsamples)
+        pointing.pitch += np.random.normal(0, sigma_psi/coef, nsamples)
     return pointing
