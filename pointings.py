@@ -229,14 +229,14 @@ def create_sweeping_pointings(parameter_to_change= None,
     return out
 
 def corrupt_pointing(pointing, 
-                     sigma_azimuth=None, # arcsec
-                     sigma_elevation=None,
-                     sigma_psi=None):
+                     sigma_azimuth=0, # arcsec
+                     sigma_elevation=0,
+                     sigma_psi=0):
     nsamples = len(pointing) 
-    if sigma_azimuth != None:
+    if sigma_azimuth != 0:
         pointing.azimuth += np.random.normal(0, sigma_azimuth, nsamples)
-    if sigma_elevation != None:
+    if sigma_elevation != 0:
         pointing.elevation += np.random.normal(0, sigma_elevation, nsamples)
-    if sigma_psi != None:
-        pointing.sigma_psi += np.random.normal(0, sigma_psi, nsamples)
+    if sigma_psi != 0:
+        pointing.pitch += np.random.normal(0, sigma_psi, nsamples)
     return pointing
