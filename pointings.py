@@ -232,7 +232,9 @@ def corrupt_pointing(pointing,
                      sigma_azimuth=0, # arcmin
                      sigma_elevation=0,
                      sigma_psi=0,
-                     units='arcmin'):
+                     units='arcmin',
+                     seed=0):
+    np.random.seed(seed)
     nsamples = len(pointing)
     if units not in ('arcsec', 'arcmin', 'deg'):
         raise ValueError('Wrong units for corrupt_pointing function')
