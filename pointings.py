@@ -6,7 +6,7 @@ from pyoperators import (
     Cartesian2SphericalOperator, Rotation3dOperator,
     Spherical2CartesianOperator)
 from pysimulators import CartesianEquatorial2HorizontalOperator, SphericalHorizontal2EquatorialOperator
-from copy import copy
+from copy import deepcopy
 
 def create_sweeping_pointings(parameter_to_change= None,
                               value_of_parameter = None,
@@ -235,7 +235,7 @@ def corrupt_pointing(pointing,
                      sigma_psi=0,
                      units='arcmin',
                      seed=0):
-    p = copy(pointing)
+    p = deepcopy(pointing)
     np.random.seed(seed)
     nsamples = len(p)
     if units not in ('arcsec', 'arcmin', 'deg'):
