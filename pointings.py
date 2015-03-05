@@ -6,6 +6,7 @@ from pyoperators import (
     Cartesian2SphericalOperator, Rotation3dOperator,
     Spherical2CartesianOperator)
 from pysimulators import CartesianEquatorial2HorizontalOperator, SphericalHorizontal2EquatorialOperator
+from copy import copy
 
 def create_sweeping_pointings(parameter_to_change= None,
                               value_of_parameter = None,
@@ -234,17 +235,18 @@ def corrupt_pointing(pointing,
                      sigma_psi=0,
                      units='arcmin',
                      seed=0):
+    p = copy(pointing)
     np.random.seed(seed)
-    nsamples = len(pointing)
+    nsamples = len(p)
     if units not in ('arcsec', 'arcmin', 'deg'):
         raise ValueError('Wrong units for corrupt_pointing function')
     coef = {'arcsec': 3600,
             'arcmin': 60,
             'deg': 1}[units]
     if sigma_azimuth != 0:
-        pointing.azimuth += np.random.normal(0, sigma_azimuth/coef, nsamples)
+        p.azimuth += np.random.normal(0, sigma_azimuth/coef, nsamples)
     if sigma_elevation != 0:
-        pointing.elevation += np.random.normal(0, sigma_elevation/coef, nsamples)
+        p.elevation += np.random.normal(0, sigma_elevation/coef, nsamples)
     if sigma_psi != 0:
-        pointing.pitch += np.random.normal(0, sigma_psi/coef, nsamples)
-    return pointing
+        p.pitch += np.random.normal(0, sigma_psi/coef, nsamples)
+    return p
