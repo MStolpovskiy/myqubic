@@ -1,5 +1,5 @@
 import numpy as np
-from qubic.pointings import QubicSampling, equ2hor
+from qubic import QubicSampling, equ2hor
 from astropy.time import TimeDelta
 from pdb import set_trace
 from pyoperators import (
@@ -235,7 +235,15 @@ def corrupt_pointing(pointing,
                      sigma_psi=0,
                      units='arcmin',
                      seed=0):
-    p = deepcopy(pointing)
+    #p = deepcopy(pointing)
+    p = QubicSampling(azimuth=pointing.azimuth.copy(), 
+                      elevation=pointing.elevation.copy(),
+                      pitch=pointing.pitch.copy(),
+                      period=pointing.period,
+                      latitude=pointing.latitude,
+                      longitude=pointing.longitude)
+    p.angle_hwp = pointing.angle_hwp.copy()
+    p.date_obs = pointing.date_obs.copy()
     np.random.seed(seed)
     nsamples = len(p)
     if units not in ('arcsec', 'arcmin', 'deg'):
