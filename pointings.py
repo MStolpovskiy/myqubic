@@ -26,8 +26,7 @@ def create_sweeping_pointings(parameter_to_change= None,
                               delta_el_corr=0.0,
                               ss_az='sss',
                               ss_el='el_enlarged1',
-                              hwp_div=8,
-                              dead_time=0):
+                              hwp_div=8):
     """
     Return pointings according to the sweeping strategy:
     Sweep around the tracked FOV center azimuth at a fixed elevation, and
@@ -107,7 +106,7 @@ def create_sweeping_pointings(parameter_to_change= None,
 
     if parameter_to_change != None and value_of_parameter != None:
         exec parameter_to_change + '=' + str(value_of_parameter)
-
+        
     nsamples = int(np.ceil(duration * 3600 / sampling_period))
     out = QubicSampling(
         nsamples, date_obs=date_obs, period=sampling_period,
@@ -116,6 +115,9 @@ def create_sweeping_pointings(parameter_to_change= None,
     deccenter = center[1]
     backforthdt = delta_az / angspeed * 2
 
+    out.angspeed = angspeed
+    out.delta_az = delta_az
+    
     # compute the sweep number
     isweeps = np.floor(out.time / backforthdt).astype(int)
 
@@ -258,3 +260,21 @@ def corrupt_pointing(pointing,
     if sigma_psi != 0:
         p.pitch += np.random.normal(0, sigma_psi/coef, nsamples)
     return p
+
+def mask_pointing(pointing, dead_time=5.):
+    '''
+    '''
+    if not hasattr(pointing, 'angspeed') or not hasattr(pointing, 'delta_az'):
+        raise ValueError('pointing object must be created by myqubic.create_sweeping_pointings function')
+
+    nsamples = len(pointing)
+    nsamples_for_one_sweep = int(pointing.delta_az / pointing.angspeed / pointing.period)
+    nsamples_to_mask_on_each_edge = int(dead_time / pointing.period / 2)
+    mask = np.ones(len(pointing), dtype=bool)
+    nsweeps = nsamples // nsamples_for_one_sweep
+    for isweep in xrange(nsweeps):
+        start = isweep*nsamples_for_one_sweep
+        finish = start + nsamples_for_one_sweep
+        mask[start : finish][:nsamples_to_mask_on_each_edge] *= False
+        mask[start : finish][-nsamples_to_mask_on_each_edge:] *= False
+    return mask
