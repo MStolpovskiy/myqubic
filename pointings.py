@@ -23,10 +23,12 @@ def create_sweeping_pointings(parameter_to_change= None,
                               longitude=None,
                               return_hor=True,
                               delta_nsw=0.0,
-                              delta_el_corr=0.0,
                               ss_az='sss',
-                              ss_el='el_enlarged1',
-                              hwp_div=8):
+                              ss_el=None,
+                              ss_psi='sss',
+                              hwp_div=8,
+                              dead_time=5 # sec
+                              ):
     """
     Return pointings according to the sweeping strategy:
     Sweep around the tracked FOV center azimuth at a fixed elevation, and
@@ -67,42 +69,13 @@ def create_sweeping_pointings(parameter_to_change= None,
         in degrees.
 
     """
-    sin_az_changing = False
     do_fast_sweeping = False
     standard_scanning_az = False
-    standard_scanning_el = False
-    progressive1_sin_az_ch = False
-    progressive2_sin_az_ch = False
-    no_ss_az = False
-    no_ss_el = False
-    el_enlarged1 = False
-    el_enlarged2 = False
-    progr_el = False
+    standard_scanning_el = True
     if ss_az == None or ss_az == 'sss' or ss_az[:-4] == 'sss':
         standard_scanning_az = True
-    elif ss_az == 'sin_az' or ss_az[:-4] == 'sin_az':
-        sin_az_changing = True
-    elif ss_az == 'progr1_sin_az' or ss_az[:-4] == 'progr1_sin_az':
-        progressive1_sin_az_ch = True
-    elif ss_az == 'progr2_sin_az' or ss_az[:-4] == 'progr2_sin_az':
-        progressive2_sin_az_ch = True
-    elif ss_az == 'lin_az' or ss_az[:-4] == 'lin_az':
-        pass
-    elif ss_az == 'no_ss':
-        no_ss_az = True
     if ss_az != None and ss_az[-4:] == '_fsw':
         do_fast_sweeping = True
-
-    if ss_el == 'progr_el':
-        progr_el = True
-    elif ss_el == 'el_enlarged1':
-        el_enlarged1 = True
-    elif ss_el == 'el_enlarged2':
-        el_enlarged2 = True
-    elif ss_el == 'no_ss':
-        no_ss_el = True
-    else:
-        standard_scanning_el = True
 
     if parameter_to_change != None and value_of_parameter != None:
         exec parameter_to_change + '=' + str(value_of_parameter)
@@ -113,11 +86,8 @@ def create_sweeping_pointings(parameter_to_change= None,
         latitude=latitude, longitude=longitude)
     racenter = center[0]
     deccenter = center[1]
-    backforthdt = delta_az / angspeed * 2
+    backforthdt = delta_az / angspeed * 2 + 2 * dead_time
 
-    out.angspeed = angspeed
-    out.delta_az = delta_az
-    
     # compute the sweep number
     isweeps = np.floor(out.time / backforthdt).astype(int)
 
@@ -127,28 +97,11 @@ def create_sweeping_pointings(parameter_to_change= None,
                                  longitude=out.longitude)
 
     # compute azimuth offset for all time samples
-    if sin_az_changing:
-        daz = - delta_az/2. * np.cos(out.time * 2*np.pi / backforthdt)
-    elif progressive1_sin_az_ch:
-        daz = - delta_az/2. * np.cos(out.time * 2*np.pi / backforthdt)
-        A = 0.04
-        daz *= A*(1-np.cos(4*out.time * 2*np.pi / backforthdt)) + 1
-    elif progressive2_sin_az_ch:
-        daz = out.time * angspeed
-        daz = daz % (delta_az * 2)
-        mask = daz > delta_az
-        daz[mask] = -daz[mask] + 2 * delta_az
-        daz -= delta_az / 2
-        sin_daz = - delta_az/2. * np.cos(out.time * 2*np.pi / backforthdt)
-        daz = 2*daz - sin_daz
-    elif no_ss_az:
-        daz = 0.
-    else:
-        daz = out.time * angspeed
-        daz = daz % (delta_az * 2)
-        mask = daz > delta_az
-        daz[mask] = -daz[mask] + 2 * delta_az
-        daz -= delta_az / 2
+    daz = out.time * angspeed
+    daz = daz % ((delta_az + dead_time / angspeed) * 2)
+    mask = daz > (delta_az + dead_time / angspeed)
+    daz[mask] = -daz[mask] + 2 * delta_az + dead_time / angspeed
+    daz -= delta_az / 2
     
     if do_fast_sweeping:
         delta_az_fs = 2. #deg
@@ -156,67 +109,35 @@ def create_sweeping_pointings(parameter_to_change= None,
         fast_sweeping = delta_az_fs * np.sin(B*out.time)
         daz += fast_sweeping
 
-    # correction on RA and declination
-    x = (elcenter - np.min(elcenter)) * np.pi / (np.max(elcenter) - np.min(elcenter))
-    elevation_corr = np.zeros(nsamples)
-    nsweeps_corr = np.zeros(nsamples)
-    mask = (x < np.pi/4.) + (x > np.pi*3./4.)
-    elevation_corr[mask] = np.sin(8*x[mask]) * delta_az*delta_el_corr
-    nsweeps_corr[mask] = nsweeps_per_elevation * (1-delta_nsw)
-    mask = np.invert(mask)
-    elevation_corr[mask] = 0.
-    nsweeps_corr[mask] = nsweeps_per_elevation
-    
     # elevation is kept constant during nsweeps_per_elevation
     elcst = np.zeros(nsamples)
-    elcst_m = np.zeros(nsamples)
     ielevations = isweeps // nsweeps_per_elevation
-    ielevations_m = np.array([]).astype(int)
     nsamples_per_sweep = int(backforthdt / sampling_period)
     iel = 0
-    while len(ielevations_m) < nsamples:
-        add = (np.ones(nsweeps_corr[len(ielevations_m)]*nsamples_per_sweep)*iel).astype(int)
-        if iel == 0:
-            ielevations_m = add
-        else:
-            ielevations_m = np.concatenate((ielevations_m, add), axis=1)
-        iel += 1
-    ielevations_m = ielevations_m[:nsamples]
 
     nelevations = ielevations[-1] + 1
-    nelevations_m = ielevations_m[-1] + 1
-    if el_enlarged1:
-        min_el = np.min(elcenter)
-        elcenter -= min_el
-        elcenter *= 1. - delta_el_corr
-        elcenter += min_el
-    elif el_enlarged2:
-        elcenter = np.ones(nsamples) * np.min(elcenter)
     for i in xrange(nelevations):
         mask = ielevations == i
         elcst[mask] = np.mean(elcenter[mask])
-    for i in xrange(nelevations_m):
-        mask = ielevations_m == i
-        elcst_m[mask] = np.mean(elcenter[mask]) + np.mean(elevation_corr[mask])
                 
     # azimuth and elevations to use for pointing
     azptg = azcenter + daz
-    if standard_scanning_el or el_enlarged1 or el_enlarged2:
+    if standard_scanning_el:
         elptg = elcst
-    elif no_ss_el:
-        elptg = elcenter
-    elif progr_el:
-        elptg = elcst_m
             
     ### scan psi as well
-    if maxpsi == 0 or angspeed_psi == 0:
+    if maxpsi == 0:
         pitch = np.zeros(len(out.time))
-    else:
+    elif ss_psi == 'sss':
         pitch = out.time * angspeed_psi
         pitch = pitch % (4 * maxpsi)
         mask = pitch > (2 * maxpsi)
         pitch[mask] = -pitch[mask] + 4 * maxpsi
         pitch -= maxpsi
+    elif ss_psi == 'const_during_hwp_full_rot':
+        pitch = np.ones(nsamples) * maxpsi
+        mask = (out.time // (backforthdt * hwp_div / 2)) % 2 == 1
+        pitch[mask] *= -1
 
     # HWP rotating
     hwp = np.floor(out.time*2 / backforthdt).astype(float)
@@ -228,6 +149,10 @@ def create_sweeping_pointings(parameter_to_change= None,
     out.elevation = elptg
     out.pitch = pitch
     out.angle_hwp = hwp
+    
+    # mask pointings during the dead time
+    mask = (daz < delta_az / 2) * (daz > - delta_az / 2)
+    out = out[mask]
     
     return out
 
@@ -261,20 +186,3 @@ def corrupt_pointing(pointing,
         p.pitch += np.random.normal(0, sigma_psi/coef, nsamples)
     return p
 
-def mask_pointing(pointing, dead_time=5.):
-    '''
-    '''
-    if not hasattr(pointing, 'angspeed') or not hasattr(pointing, 'delta_az'):
-        raise ValueError('pointing object must be created by myqubic.create_sweeping_pointings function')
-
-    nsamples = len(pointing)
-    nsamples_for_one_sweep = int(pointing.delta_az / pointing.angspeed / pointing.period)
-    nsamples_to_mask_on_each_edge = int(dead_time / pointing.period / 2)
-    mask = np.ones(len(pointing), dtype=bool)
-    nsweeps = nsamples // nsamples_for_one_sweep
-    for isweep in xrange(nsweeps):
-        start = isweep*nsamples_for_one_sweep
-        finish = start + nsamples_for_one_sweep
-        mask[start : finish][:nsamples_to_mask_on_each_edge] *= False
-        mask[start : finish][-nsamples_to_mask_on_each_edge:] *= False
-    return mask
